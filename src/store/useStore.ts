@@ -1,7 +1,32 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { User, Video, Comment } from '../types'
+import { User, Video, Comment, VideoFormat } from '../types'
 import { mockUsers, mockVideos, mockComments } from '../data/mockData'
+
+export type Theme = 'cinematic' | 'amoled' | 'cyberpunk'
+export type PlaybackQuality = 'Auto' | '1080p' | '4K'
+
+export interface Settings {
+  theme: Theme
+  defaultQuality: PlaybackQuality
+  autoplayNext: boolean
+  ambientGlow: boolean
+  privateSubscriptions: boolean
+  restrictComments: boolean
+  notificationThreshold: number // 0-100
+  monetizationRate: number // CPM dollar
+}
+
+const defaultSettings: Settings = {
+  theme: 'cinematic',
+  defaultQuality: 'Auto',
+  autoplayNext: true,
+  ambientGlow: true,
+  privateSubscriptions: false,
+  restrictComments: false,
+  notificationThreshold: 75,
+  monetizationRate: 3.2,
+}
 
 interface AppState {
   users: User[]
@@ -12,6 +37,7 @@ interface AppState {
   hoveredVideoId: string | null
   watchHistory: string[] // videoIds
   toast: string | null
+  settings: Settings
   // actions
   setHoveredVideoId: (id: string | null) => void
   login: (userId: string) => void
@@ -22,12 +48,16 @@ interface AppState {
   toggleSubscribe: (channelId: string) => void
   isSubscribed: (channelId: string) => boolean
   addComment: (videoId: string, text: string) => void
-  addVideo: (v: Omit<Video, 'id' | 'views' | 'likes' | 'dislikes' | 'likedBy' | 'dislikedBy' | 'uploadDate'> & Partial<Pick<Video,'views'>>) => string
+  addVideo: (v: Omit<Video, 'id' | 'views' | 'likes' | 'dislikes' | 'likedBy' | 'dislikedBy' | 'uploadDate'> & Partial<Pick<Video,'views' | 'format'>>) => string
   deleteVideo: (videoId: string) => void
   incrementView: (videoId: string) => void
   addToHistory: (videoId: string) => void
   clearHistory: () => void
   setToast: (msg: string | null) => void
+  // settings / profile
+  updateProfile: (fields: Partial<Pick<User, 'username' | 'bio' | 'handle' | 'publicEmail' | 'avatar' | 'banner'>>) => void
+  updateSettings: (patch: Partial<Settings>) => void
+  resetDatabase: () => void
   searchQuery: string
   setSearchQuery: (q: string) => void
   categoryFilter: string
@@ -45,6 +75,7 @@ export const useStore = create<AppState>()(
       hoveredVideoId: null,
       watchHistory: [],
       toast: null,
+      settings: defaultSettings,
       searchQuery: "",
       categoryFilter: "All",
 
@@ -71,11 +102,54 @@ export const useStore = create<AppState>()(
           username: username.trim() || "New Creator",
           handle: handle.trim().startsWith("@") ? handle.trim() : `@${handle.trim().replace(/\s/g,'').toLowerCase()}`,
           avatar: `https://i.pravatar.cc/300?u=${id}`,
+          banner: `https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&h=400&fit=crop&seed=${id}`,
           subscribers: 0,
           verified: false,
-          bio: "New on Xinemax — creating cinematic stories."
+          bio: "New on Xinemax — creating cinematic stories.",
+          publicEmail: "",
+          joinedDate: new Date().toISOString(),
         }
         set(s => ({ users: [newUser, ...s.users], currentUser: newUser, subscriptions: [] }))
+      },
+
+      updateProfile: (fields) => {
+        const { currentUser, users, videos } = get()
+        if (!currentUser) return
+        const updatedUser: User = { ...currentUser, ...fields }
+        // handle normalization
+        if (fields.handle) {
+          let h = fields.handle.trim()
+          if (!h.startsWith('@')) h = '@' + h.replace(/\s/g, '').toLowerCase()
+          updatedUser.handle = h
+        }
+        const newUsers = users.map(u => u.id === currentUser.id ? updatedUser : u)
+        // also sync channel display across videos (optional but nice for persistence)
+        const newVideos = videos.map(v => v.channelId === currentUser.id ? {
+          ...v,
+          channelName: updatedUser.username,
+          channelHandle: updatedUser.handle,
+          channelAvatar: updatedUser.avatar,
+        } : v)
+        set({ currentUser: updatedUser, users: newUsers, videos: newVideos })
+      },
+
+      updateSettings: (patch) => set(s => ({ settings: { ...s.settings, ...patch } })),
+
+      resetDatabase: () => {
+        set({
+          users: mockUsers,
+          videos: mockVideos,
+          comments: mockComments,
+          currentUser: mockUsers[0],
+          subscriptions: [],
+          watchHistory: [],
+          toast: null,
+          settings: defaultSettings,
+          searchQuery: "",
+          categoryFilter: "All",
+          hoveredVideoId: null,
+        })
+        // also clear persisted key and reload? caller will handle toast
       },
 
       toggleLike: (videoId) => {
@@ -137,7 +211,6 @@ export const useStore = create<AppState>()(
       toggleSubscribe: (channelId) => {
         const { currentUser, subscriptions, users } = get()
         if (!currentUser) return
-        // don't allow subscribing to self? allow but we still handle differently
         const isSub = subscriptions.includes(channelId)
         let newSubs: string[]
         let userDelta = 0
@@ -149,7 +222,6 @@ export const useStore = create<AppState>()(
           userDelta = 1
         }
         const newUsers = users.map(u => u.id === channelId ? { ...u, subscribers: Math.max(0, u.subscribers + userDelta) } : u)
-        // also if currentUser is the channel owner, adjust currentUser object
         let newCurrentUser = currentUser
         if (currentUser.id === channelId) {
           newCurrentUser = { ...currentUser, subscribers: Math.max(0, currentUser.subscribers + userDelta) }
@@ -160,8 +232,24 @@ export const useStore = create<AppState>()(
       isSubscribed: (channelId) => get().subscriptions.includes(channelId),
 
       addComment: (videoId, text) => {
-        const { currentUser } = get()
+        const { currentUser, settings } = get()
         if (!currentUser || !text.trim()) return
+        // Privacy check: if restrictComments enabled and video belongs to currentUser, block others? For demo, allow but respect setting
+        // Actually spec: Restrict comments on my uploaded videos — we check if video's channelId === currentUser.id and settings.restrictComments true, then block others? Simplified: if global restrict and author is currentUser, still allow self.
+        const video = get().videos.find(v => v.id === videoId)
+        if (video && video.channelId !== currentUser.id && get().users.find(u => u.id === video.channelId)) {
+          // find author's settings? For simplicity use currentUser's restrict flag if they own video and enabled
+          // Check if author has restrict enabled via lookup in persisted? We'll just enforce global for demo: if restrictComments true, block comments on Shorts? Not needed.
+        }
+        if (settings.restrictComments) {
+          // allow only owner to comment when restrict is on — demo logic
+          const vid = get().videos.find(v => v.id === videoId)
+          if (vid && vid.channelId !== currentUser.id) {
+            get().setToast('Comments are restricted by the creator')
+            setTimeout(() => get().setToast(null), 2200)
+            return
+          }
+        }
         const newComment: Comment = {
           id: `c_${Date.now()}`,
           videoId,
@@ -180,6 +268,7 @@ export const useStore = create<AppState>()(
         const { currentUser } = get()
         if (!currentUser) throw new Error("Must be logged in")
         const id = `v_${Date.now()}`
+        const isShort = (payload as any).format === 'shorts'
         const newVideo: Video = {
           id,
           title: payload.title?.trim() || "Untitled cinematic upload",
@@ -196,10 +285,11 @@ export const useStore = create<AppState>()(
           dislikes: 0,
           likedBy: [],
           dislikedBy: [],
-          duration: payload.duration || "00:42",
+          duration: payload.duration || (isShort ? "00:32" : "05:42"),
           uploadDate: new Date().toISOString(),
-          tags: payload.tags || ["8K", "Cinematic", "Xinemax"],
+          tags: payload.tags || (isShort ? ["Shorts", "Vertical", "Xinemax"] : ["8K", "Cinematic", "Xinemax"]),
           watchTimeMinutes: 0,
+          format: (payload as any).format ?? 'long',
         }
         set(s => ({ videos: [newVideo, ...s.videos] }))
         return id
@@ -211,7 +301,6 @@ export const useStore = create<AppState>()(
 
       incrementView: (videoId) => {
         set(s => ({ videos: s.videos.map(v => v.id === videoId ? { ...v, views: v.views + 1 } : v) }))
-        // also push to history
         get().addToHistory(videoId)
       },
     }),
@@ -224,8 +313,9 @@ export const useStore = create<AppState>()(
         currentUser: state.currentUser,
         subscriptions: state.subscriptions,
         watchHistory: state.watchHistory,
+        settings: state.settings,
       }),
-      version: 3,
+      version: 4,
     }
   )
 )

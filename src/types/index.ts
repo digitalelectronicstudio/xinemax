@@ -8,7 +8,10 @@ export interface User {
   verified?: boolean;
   bio?: string;
   joinedDate?: string;
+  publicEmail?: string;
 }
+
+export type VideoFormat = 'long' | 'shorts'
 
 export interface Video {
   id: string;
@@ -30,6 +33,7 @@ export interface Video {
   uploadDate: string; // ISO
   tags: string[];
   watchTimeMinutes?: number;
+  format?: VideoFormat; // 'shorts' for 9:16, undefined/'long' for 16:9
 }
 
 export interface Comment {
