@@ -7,6 +7,7 @@ export interface User {
   subscribers: number;
   verified?: boolean;
   bio?: string;
+  joinedDate?: string;
 }
 
 export interface Video {

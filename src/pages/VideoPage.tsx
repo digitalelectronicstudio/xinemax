@@ -98,12 +98,12 @@ export default function VideoPage() {
 
             <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Link to="#" className="flex items-center gap-3 group">
-                  <img src={video.channelAvatar} alt={video.channelName} className="w-10 h-10 rounded-full object-cover border border-white/10" />
+                <Link to={`/channel/${video.channelId}`} className="flex items-center gap-3 group">
+                  <img src={video.channelAvatar} alt={video.channelName} className="w-10 h-10 rounded-full object-cover border border-white/10 group-hover:border-[#ff4d00]/30 transition-colors" />
                   <div className="text-left">
                     <div className="font-semibold text-sm leading-none flex items-center gap-1.5 group-hover:underline">
                       {video.channelName}
-                      <span className="w-3.5 h-3.5 rounded-full bg-white text-black flex items-center justify-center text-[9px] font-bold">✓</span>
+                      {channelUser?.verified && <span className="w-3.5 h-3.5 rounded-full bg-white text-black flex items-center justify-center text-[9px] font-bold">✓</span>}
                     </div>
                     <div className="text-xs text-white/50">{formatViews(channelUser?.subscribers ?? 0)} subscribers • {video.channelHandle}</div>
                   </div>
@@ -249,11 +249,11 @@ export default function VideoPage() {
               </Link>
             ))}
             <div className="rounded-xl bg-[#14141c] border border-white/5 p-3 flex gap-3">
-              <img src="https://i.pravatar.cc/150?img=5" className="w-10 h-10 rounded-full" alt="" />
+              <img src={video.channelAvatar} className="w-10 h-10 rounded-full object-cover" alt={video.channelName} />
               <div className="flex-1">
                 <div className="text-sm font-semibold">More from {video.channelName}</div>
                 <div className="text-xs text-white/50">{video.channelHandle} • {videos.filter(x=>x.channelId===video.channelId).length} videos</div>
-                <button className="mt-2 h-8 px-4 rounded-full bg-white text-black text-xs font-bold">Visit channel</button>
+                <Link to={`/channel/${video.channelId}`} className="mt-2 h-8 px-4 rounded-full bg-white text-black text-xs font-bold inline-flex items-center justify-center">Visit channel</Link>
               </div>
             </div>
           </div>

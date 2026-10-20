@@ -60,12 +60,18 @@ export default function VideoCard({ video, index }: { video: Video, index: numbe
           {/* content — cinematic reveal: slide up + fade */}
           <div className="p-3 sm:p-3.5">
             <div className="flex gap-3">
-              <img
-                src={video.channelAvatar}
-                alt={video.channelName}
-                className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5 border border-white/10"
-                onError={(e) => (e.target as HTMLImageElement).src = `https://i.pravatar.cc/150?u=${video.channelId}`}
-              />
+              <Link
+                to={`/channel/${video.channelId}`}
+                onClick={e => e.stopPropagation()}
+                className="shrink-0"
+              >
+                <img
+                  src={video.channelAvatar}
+                  alt={video.channelName}
+                  className="w-9 h-9 rounded-full object-cover mt-0.5 border border-white/10 hover:border-[#ff4d00]/40 transition-colors"
+                  onError={(e) => (e.target as HTMLImageElement).src = `https://i.pravatar.cc/150?u=${video.channelId}`}
+                />
+              </Link>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-[14px] leading-[1.35] line-clamp-2 group-hover:text-white transition-colors">
                   {video.title}
@@ -73,12 +79,16 @@ export default function VideoCard({ video, index }: { video: Video, index: numbe
 
                 {/* Reveal meta on hover: opacity 0 -> 1 + translateY */}
                 <div className="mt-1.5 space-y-0.5 transition-all duration-300 ease-out opacity-70 group-hover:opacity-100 translate-y-0 group-hover:translate-y-0">
-                  <div className="flex items-center gap-1.5 text-[13px] text-white/60 group-hover:text-white/80 transition-colors">
-                    <span className="truncate hover:text-white">{video.channelName}</span>
-                    {video.channelId === 'u_elena' && (
+                  <Link
+                    to={`/channel/${video.channelId}`}
+                    onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1.5 text-[13px] text-white/60 hover:text-white group/channel transition-colors w-fit"
+                  >
+                    <span className="truncate group-hover/channel:underline">{video.channelName}</span>
+                    {(video.channelId === 'u_elena' || video.channelId === 'u_marcus') && (
                       <span className="w-3.5 h-3.5 rounded-full bg-white text-black flex items-center justify-center text-[9px] font-bold shrink-0">✓</span>
                     )}
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-1.5 text-xs text-white/40 group-hover:text-white/60 transition-colors">
                     <Eye className="w-3 h-3" />
                     <span>{formatViews(video.views)} views</span>
