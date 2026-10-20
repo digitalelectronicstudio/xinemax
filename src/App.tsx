@@ -11,7 +11,7 @@ import SubscriptionsPage from './pages/SubscriptionsPage'
 import ChannelPage from './pages/ChannelPage'
 import ShortsPage from './pages/ShortsPage'
 import SettingsPage from './pages/SettingsPage'
-import { useStore } from './store/useStore'
+import { useStore, initFirebaseSync } from './store/useStore'
 import { Home as HomeIcon, LayoutDashboard } from 'lucide-react'
 
 function ImmersiveBackground() {
@@ -150,6 +150,11 @@ export default function App() {
       document.body.style.background = '#06060a'
     }
   }, [theme])
+
+  // Silent Firebase hydration — best-effort, never blocks UI
+  useEffect(() => {
+    initFirebaseSync()
+  }, [])
 
   // lock scroll when mobile sidebar open
   useEffect(() => {

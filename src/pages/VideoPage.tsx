@@ -1,18 +1,22 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { ThumbsUp, ThumbsDown, Share2, Bookmark, ChevronDown, ChevronUp, Eye, Clock, Send, MoreHorizontal } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Share2, Bookmark, ChevronDown, ChevronUp, Eye, Clock, Send, MoreHorizontal, Subtitles, Captions } from 'lucide-react'
 import { formatViews, formatTimeAgo, formatDurationUpload } from '../utils/format'
 import { motion } from 'framer-motion'
+import { getActiveCue, durationToSeconds, generateSubtitlePack, attachVTTTrack } from '../utils/subtitles'
 
 export default function VideoPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { videos, comments, currentUser, toggleLike, toggleDislike, toggleSubscribe, isSubscribed, addComment, incrementView, users, settings } = useStore()
+  const { videos, comments, currentUser, toggleLike, toggleDislike, toggleSubscribe, isSubscribed, addComment, incrementView, users, settings, ensureVideoSubtitles } = useStore()
   const video = videos.find(v => v.id === id)
   const channelUser = users.find(u => u.id === video?.channelId)
   const [showDesc, setShowDesc] = useState(false)
   const [commentText, setCommentText] = useState("")
+  const [ccEnabled, setCcEnabled] = useState(true)
+  const [currentTime, setCurrentTime] = useState(0)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const videoComments = useMemo(() => comments.filter(c => c.videoId === id).sort((a,b) => +new Date(b.timestamp) - +new Date(a.timestamp)), [comments, id])
   const recommended = useMemo(() => videos.filter(v => v.id !== id && v.format !== 'shorts').slice(0,6), [videos, id])
@@ -27,6 +31,32 @@ export default function VideoPage() {
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, video?.id])
+
+  // Ensure AI subtitles exist (client-side VTT auto-generation + save to Firestore via store)
+  useEffect(() => {
+    if (video && !video.subtitles) {
+      ensureVideoSubtitles(video.id)
+    }
+  }, [video?.id, video?.subtitles, ensureVideoSubtitles])
+
+  // Attach TextTrack when video loads / cc toggled
+  useEffect(() => {
+    if (!videoRef.current || !video) return
+    const v = videoRef.current
+    const pack = video.subtitles ?? generateSubtitlePack(video.title, video.description, durationToSeconds(video.duration))
+    try {
+      attachVTTTrack(v, pack.vtt)
+      const track = v.textTracks[0] as any
+      if (track) track.mode = ccEnabled ? 'showing' : 'hidden'
+    } catch {}
+  }, [video?.id, video?.subtitles, video?.title, video?.description, video?.duration, ccEnabled])
+
+  // Update cue visibility on toggle
+  useEffect(() => {
+    if (!videoRef.current) return
+    const t = videoRef.current.textTracks[0] as any
+    if (t) t.mode = ccEnabled ? 'showing' : 'hidden'
+  }, [ccEnabled])
 
   if (!video) {
     return (
@@ -43,6 +73,8 @@ export default function VideoPage() {
   const isDisliked = currentUser ? video.dislikedBy.includes(currentUser.id) : false
   const subscribed = isSubscribed(video.channelId)
   const isCommentsRestricted = settings.restrictComments && video.channelId !== currentUser?.id
+  const subtitlePack = video.subtitles ?? generateSubtitlePack(video.title, video.description, durationToSeconds(video.duration))
+  const activeCue = ccEnabled ? getActiveCue(subtitlePack.cues, currentTime) : null
 
   const handleLike = () => {
     if (!currentUser) return alert("Please sign in to like videos.")
@@ -66,7 +98,6 @@ export default function VideoPage() {
 
   const handleEnded = () => {
     if (settings.autoplayNext && recommended[0]) {
-      // subtle delay to mimic YouTube autoplay countdown
       setTimeout(() => navigate(`/watch/${recommended[0].id}`), 900)
     }
   }
@@ -88,15 +119,17 @@ export default function VideoPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
-              className="relative aspect-video w-full rounded-[16px] overflow-hidden bg-black border border-white/10"
+              className="relative aspect-video w-full rounded-[16px] overflow-hidden bg-black border border-white/10 group"
             >
               <video
+                ref={videoRef}
                 key={video.videoUrl}
                 src={video.videoUrl}
                 controls
                 playsInline
                 poster={video.thumbnail}
                 onEnded={handleEnded}
+                onTimeUpdate={e => setCurrentTime((e.target as HTMLVideoElement).currentTime)}
                 className="w-full h-full object-contain bg-black"
                 onError={(e) => {
                   const el = e.target as HTMLVideoElement
@@ -109,6 +142,25 @@ export default function VideoPage() {
               <div className="absolute top-3 left-3 px-2 py-1 rounded-full bg-black/70 backdrop-blur text-[11px] font-bold tracking-wide border border-white/10">
                 {settings.defaultQuality === '4K' ? '4K • SIM' : settings.defaultQuality}
               </div>
+              {/* CC strict toggle */}
+              <button
+                onClick={() => setCcEnabled(!ccEnabled)}
+                title={ccEnabled ? 'Hide captions' : 'Show captions'}
+                className={`absolute top-3 right-3 h-8 px-3 rounded-full backdrop-blur-md border text-xs font-bold flex items-center gap-1.5 transition-colors ${ccEnabled ? 'bg-[#ff4d00] border-[#ff4d00] text-white' : 'bg-black/60 border-white/20 text-white hover:bg-black/80'}`}
+              >
+                {ccEnabled ? <Subtitles className="w-3.5 h-3.5" /> : <Captions className="w-3.5 h-3.5 opacity-70" />}
+                CC
+              </button>
+              {/* AI Subtitles overlay — bottom-center, font-medium white backdrop-blur-md, centered even on mobile fullscreen */}
+              {activeCue && (
+                <div className="absolute bottom-8 md:bottom-6 left-1/2 -translate-x-1/2 w-[88%] max-w-[560px] flex justify-center pointer-events-none">
+                  <div className="px-3 py-2 rounded-xl bg-black/45 backdrop-blur-md border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.45)] text-center">
+                    <p className="text-white font-medium text-[13px] md:text-sm leading-snug line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+                      {activeCue.text}
+                    </p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
           {settings.autoplayNext && recommended[0] && (

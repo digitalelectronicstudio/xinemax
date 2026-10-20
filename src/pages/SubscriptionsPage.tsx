@@ -84,7 +84,7 @@ export default function SubscriptionsPage() {
         <div className="mt-8 p-4 rounded-xl bg-[#1c1c26] border border-white/5 flex gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#ff4d00] flex items-center justify-center shrink-0"><Users className="w-4 h-4 text-white" /></div>
           <div className="text-xs leading-relaxed text-white/70">
-            <span className="font-bold text-white">How subscriptions work:</span> Click Subscribe on any video page — count updates globally via Zustand. Data saves to <span className="font-mono text-[#ff8a00]">localStorage</span>. Unsubscribe toggles back instantly.
+            <span className="font-bold text-white">How subscriptions work:</span> Click Subscribe on any video page — count updates globally via Zustand. Data syncs to <span className="font-mono text-[#ff8a00]">secure storage</span>. Unsubscribe toggles back instantly.
           </div>
         </div>
       </div>
