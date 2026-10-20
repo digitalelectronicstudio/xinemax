@@ -8,6 +8,7 @@ import VideoPage from './pages/VideoPage'
 import Studio from './pages/Studio'
 import HistoryPage from './pages/HistoryPage'
 import SubscriptionsPage from './pages/SubscriptionsPage'
+import ChannelPage from './pages/ChannelPage'
 import { useStore } from './store/useStore'
 import { Home as HomeIcon, LayoutDashboard } from 'lucide-react'
 
@@ -85,6 +86,7 @@ function AnimatedRoutes() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/explore" element={<Home />} />
+          <Route path="/channel/:channelId" element={<ChannelPage />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </motion.div>
