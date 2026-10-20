@@ -10,6 +10,8 @@ interface AppState {
   currentUser: User | null
   subscriptions: string[] // channelIds subscribed by currentUser
   hoveredVideoId: string | null
+  watchHistory: string[] // videoIds
+  toast: string | null
   // actions
   setHoveredVideoId: (id: string | null) => void
   login: (userId: string) => void
@@ -23,6 +25,9 @@ interface AppState {
   addVideo: (v: Omit<Video, 'id' | 'views' | 'likes' | 'dislikes' | 'likedBy' | 'dislikedBy' | 'uploadDate'> & Partial<Pick<Video,'views'>>) => string
   deleteVideo: (videoId: string) => void
   incrementView: (videoId: string) => void
+  addToHistory: (videoId: string) => void
+  clearHistory: () => void
+  setToast: (msg: string | null) => void
   searchQuery: string
   setSearchQuery: (q: string) => void
   categoryFilter: string
@@ -38,6 +43,8 @@ export const useStore = create<AppState>()(
       currentUser: mockUsers[0], // Elena Rostova default logged in
       subscriptions: [],
       hoveredVideoId: null,
+      watchHistory: [],
+      toast: null,
       searchQuery: "",
       categoryFilter: "All",
 
@@ -45,6 +52,12 @@ export const useStore = create<AppState>()(
 
       setSearchQuery: (q) => set({ searchQuery: q }),
       setCategoryFilter: (c) => set({ categoryFilter: c }),
+      setToast: (msg) => set({ toast: msg }),
+      addToHistory: (videoId) => set(s => {
+        const filtered = s.watchHistory.filter(id => id !== videoId)
+        return { watchHistory: [videoId, ...filtered].slice(0, 50) }
+      }),
+      clearHistory: () => set({ watchHistory: [] }),
 
       login: (userId) => {
         const u = get().users.find(x => x.id === userId) || null
@@ -198,6 +211,8 @@ export const useStore = create<AppState>()(
 
       incrementView: (videoId) => {
         set(s => ({ videos: s.videos.map(v => v.id === videoId ? { ...v, views: v.views + 1 } : v) }))
+        // also push to history
+        get().addToHistory(videoId)
       },
     }),
     {
@@ -208,8 +223,9 @@ export const useStore = create<AppState>()(
         comments: state.comments,
         currentUser: state.currentUser,
         subscriptions: state.subscriptions,
+        watchHistory: state.watchHistory,
       }),
-      version: 2,
+      version: 3,
     }
   )
 )

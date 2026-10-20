@@ -6,6 +6,8 @@ import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
 import VideoPage from './pages/VideoPage'
 import Studio from './pages/Studio'
+import HistoryPage from './pages/HistoryPage'
+import SubscriptionsPage from './pages/SubscriptionsPage'
 import { useStore } from './store/useStore'
 import { Home as HomeIcon, LayoutDashboard } from 'lucide-react'
 
@@ -80,9 +82,40 @@ function AnimatedRoutes() {
           <Route path="/" element={<Home />} />
           <Route path="/watch/:id" element={<VideoPage />} />
           <Route path="/studio" element={<Studio />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/explore" element={<Home />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </motion.div>
+    </AnimatePresence>
+  )
+}
+
+function GlobalToast() {
+  const toast = useStore(s => s.toast)
+  const setToast = useStore(s => s.setToast)
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 2600)
+      return () => clearTimeout(t)
+    }
+  }, [toast, setToast])
+  return (
+    <AnimatePresence>
+      {toast && (
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.97 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+        >
+          <div className="px-4 py-3 rounded-full bg-[#1c1c26] border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center gap-2 text-sm font-medium">
+            <span className="w-2 h-2 rounded-full bg-[#ff4d00] animate-pulse" />
+            {toast}
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   )
 }
@@ -140,15 +173,21 @@ export default function App() {
           <HomeIcon className="w-5 h-5" />
           <span className="text-[10px] font-medium">Home</span>
         </Link>
-        <Link to="/studio" className="flex flex-col items-center gap-1 py-1 px-4 text-white/60">
+        <Link to="/subscriptions" className="flex flex-col items-center gap-1 py-1 px-4 text-white/60">
           <LayoutDashboard className="w-5 h-5" />
-          <span className="text-[10px]">Studio</span>
+          <span className="text-[10px]">Subs</span>
+        </Link>
+        <Link to="/history" className="flex flex-col items-center gap-1 py-1 px-4 text-white/60">
+          <span className="text-[14px]">◷</span>
+          <span className="text-[10px]">History</span>
         </Link>
         <div className="flex flex-col items-center gap-1 py-1 px-4 text-white/40">
-          <span className="text-[10px] tracking-widest font-bold">PS5 MODE</span>
+          <span className="text-[10px] tracking-widest font-bold">PS5</span>
           <span className="w-8 h-1.5 rounded-full bg-[#ff4d00] shadow-[0_0_8px_rgba(255,77,0,0.6)]" />
         </div>
       </div>
+
+      <GlobalToast />
     </div>
   )
 }

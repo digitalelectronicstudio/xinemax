@@ -4,14 +4,23 @@ import VideoCard from '../components/VideoCard'
 import { motion } from 'framer-motion'
 import { SlidersHorizontal, Sparkles } from 'lucide-react'
 
-const categories = ["All", "Cinematography", "Technology", "Nature", "Drone", "8K"]
+const categories = ["All", "Cinematography", "Technology", "Nature", "Drone 8K", "Trending", "Live"]
 
 export default function Home() {
   const { videos, categoryFilter, setCategoryFilter, searchQuery } = useStore()
 
   const filtered = useMemo(() => {
     let v = [...videos]
-    if (categoryFilter !== "All") {
+    if (categoryFilter === "Trending") {
+      v = [...v].sort((a, b) => b.views - a.views)
+    } else if (categoryFilter === "Live") {
+      // No live mock yet — intentionally empty to demo live tab
+      v = v.filter(x => (x as any).isLive || x.tags.includes("Live"))
+    } else if (categoryFilter === "Drone 8K") {
+      v = v.filter(x => x.category === "Drone" || x.tags.includes("Drone") || x.tags.includes("8K") || x.category === "Nature" && x.tags.includes("8K"))
+      // fallback: if no pure Drone category, keep 8K-heavy cinematography
+      if (v.length === 0) v = videos.filter(x => x.tags.includes("8K"))
+    } else if (categoryFilter !== "All") {
       v = v.filter(x => x.category === categoryFilter || x.tags.includes(categoryFilter))
     }
     if (searchQuery.trim()) {
