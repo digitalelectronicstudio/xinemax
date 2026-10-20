@@ -10,7 +10,7 @@ export default function Home() {
   const { videos, categoryFilter, setCategoryFilter, searchQuery } = useStore()
 
   const filtered = useMemo(() => {
-    let v = [...videos]
+    let v = [...videos].filter(v => v.format !== 'shorts')
     if (categoryFilter === "Trending") {
       v = [...v].sort((a, b) => b.views - a.views)
     } else if (categoryFilter === "Live") {

@@ -6,10 +6,30 @@
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+:root {
+  --x-bg: #06060a;
+  --x-card: #14141c;
+  --x-surface: #1c1c26;
+  --x-border: rgba(255,255,255,0.06);
+}
+[data-theme="amoled"] {
+  --x-bg: #000000;
+  --x-card: #0a0a0a;
+  --x-surface: #141414;
+  --x-border: rgba(255,255,255,0.05);
+}
+[data-theme="cyberpunk"] {
+  --x-bg: #0f0705;
+  --x-card: #1a0f0a;
+  --x-surface: #251408;
+  --x-border: rgba(255,77,0,0.16);
+}
+
 html, body {
-  background: #06060a;
+  background: var(--x-bg);
   color: #ffffff;
   overflow-x: hidden;
+  transition: background 0.3s ease;
 }
 
 ::-webkit-scrollbar {

@@ -9,6 +9,8 @@ import Studio from './pages/Studio'
 import HistoryPage from './pages/HistoryPage'
 import SubscriptionsPage from './pages/SubscriptionsPage'
 import ChannelPage from './pages/ChannelPage'
+import ShortsPage from './pages/ShortsPage'
+import SettingsPage from './pages/SettingsPage'
 import { useStore } from './store/useStore'
 import { Home as HomeIcon, LayoutDashboard } from 'lucide-react'
 
@@ -85,6 +87,8 @@ function AnimatedRoutes() {
           <Route path="/studio" element={<Studio />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/shorts" element={<ShortsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/explore" element={<Home />} />
           <Route path="/channel/:channelId" element={<ChannelPage />} />
           <Route path="*" element={<Home />} />
@@ -124,6 +128,29 @@ function GlobalToast() {
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const theme = useStore(s => s.settings.theme)
+  // Global theme — updates CSS variables instantly
+  useEffect(() => {
+    const root = document.documentElement
+    root.setAttribute('data-theme', theme)
+    if (theme === 'amoled') {
+      root.style.setProperty('--x-bg', '#000000')
+      root.style.setProperty('--x-card', '#0a0a0a')
+      root.style.setProperty('--x-surface', '#141414')
+      document.body.style.background = '#000000'
+    } else if (theme === 'cyberpunk') {
+      root.style.setProperty('--x-bg', '#0f0705')
+      root.style.setProperty('--x-card', '#1a0f0a')
+      root.style.setProperty('--x-surface', '#251408')
+      document.body.style.background = '#0f0705'
+    } else {
+      root.style.setProperty('--x-bg', '#06060a')
+      root.style.setProperty('--x-card', '#14141c')
+      root.style.setProperty('--x-surface', '#1c1c26')
+      document.body.style.background = '#06060a'
+    }
+  }, [theme])
+
   // lock scroll when mobile sidebar open
   useEffect(() => {
     if (sidebarOpen) document.body.style.overflow = 'hidden'
@@ -170,23 +197,23 @@ export default function App() {
       </div>
 
       {/* Mobile bottom nav hint */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-[#0a0a0f]/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <Link to="/" className="flex flex-col items-center gap-1 py-1 px-4">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-[#0a0a0f]/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-around px-2 py-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <Link to="/" className="flex flex-col items-center gap-1 py-1 px-3">
           <HomeIcon className="w-5 h-5" />
           <span className="text-[10px] font-medium">Home</span>
         </Link>
-        <Link to="/subscriptions" className="flex flex-col items-center gap-1 py-1 px-4 text-white/60">
+        <Link to="/shorts" className="flex flex-col items-center gap-1 py-1 px-3 text-white/60">
+          <span className="text-[14px]">▶</span>
+          <span className="text-[10px]">Shorts</span>
+        </Link>
+        <Link to="/subscriptions" className="flex flex-col items-center gap-1 py-1 px-3 text-white/60">
           <LayoutDashboard className="w-5 h-5" />
           <span className="text-[10px]">Subs</span>
         </Link>
-        <Link to="/history" className="flex flex-col items-center gap-1 py-1 px-4 text-white/60">
-          <span className="text-[14px]">◷</span>
-          <span className="text-[10px]">History</span>
+        <Link to="/settings" className="flex flex-col items-center gap-1 py-1 px-3 text-white/60">
+          <span className="text-[14px]">⚙</span>
+          <span className="text-[10px]">Settings</span>
         </Link>
-        <div className="flex flex-col items-center gap-1 py-1 px-4 text-white/40">
-          <span className="text-[10px] tracking-widest font-bold">PS5</span>
-          <span className="w-8 h-1.5 rounded-full bg-[#ff4d00] shadow-[0_0_8px_rgba(255,77,0,0.6)]" />
-        </div>
       </div>
 
       <GlobalToast />

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Home, Compass, Library, Clock, Flame, Film, Cpu, Leaf, Plane, Radio, Settings, HelpCircle, X, Crown, Sparkles, Mail, Shield, Zap } from 'lucide-react'
+import { Home, Compass, Library, Clock, Flame, Film, Cpu, Leaf, Plane, Radio, Settings, HelpCircle, X, Crown, Sparkles, Mail, Shield, Zap, Smartphone } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -18,7 +18,6 @@ export default function Sidebar({ collapsed, onClose }: { collapsed?: boolean, o
   const location = useLocation()
   const { categoryFilter, setCategoryFilter, setSearchQuery, setToast } = useStore()
   const [showPro, setShowPro] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
 
   const handleNav = (label: string, to: string) => {
@@ -72,6 +71,16 @@ export default function Sidebar({ collapsed, onClose }: { collapsed?: boolean, o
               <span>Home</span>
             </button>
 
+            <NavLink
+              to="/shorts"
+              onClick={onClose}
+              className={({ isActive }) => `flex items-center gap-3 px-3 h-9 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-white text-black' : 'hover:bg-white/10 text-white/80 hover:text-white'}`}
+            >
+              <Smartphone className="w-5 h-5 shrink-0" />
+              <span>Shorts</span>
+              <span className="ml-auto text-[10px] font-bold bg-[#ff4d00] text-white px-1.5 py-0.5 rounded-full">9:16</span>
+            </NavLink>
+
             <button
               onClick={() => handleNav('Explore', '/')}
               className="w-full flex items-center gap-3 px-3 h-9 rounded-xl text-sm font-medium hover:bg-white/10 text-white/80 hover:text-white text-left transition-colors"
@@ -97,6 +106,15 @@ export default function Sidebar({ collapsed, onClose }: { collapsed?: boolean, o
             >
               <Clock className="w-5 h-5 shrink-0" />
               <span>History</span>
+            </NavLink>
+
+            <NavLink
+              to="/settings"
+              onClick={onClose}
+              className={({ isActive }) => `flex items-center gap-3 px-3 h-9 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-white text-black' : 'hover:bg-white/10 text-white/80 hover:text-white'}`}
+            >
+              <Settings className="w-5 h-5 shrink-0" />
+              <span>Settings</span>
             </NavLink>
           </nav>
 
@@ -134,9 +152,13 @@ export default function Sidebar({ collapsed, onClose }: { collapsed?: boolean, o
           </div>
 
           <div className="pt-2 space-y-1 pb-6">
-            <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-3 px-3 h-8 rounded-xl hover:bg-white/10 text-sm text-white/60 hover:text-white transition-colors text-left">
+            <NavLink
+              to="/settings"
+              onClick={onClose}
+              className={({ isActive }) => `w-full flex items-center gap-3 px-3 h-8 rounded-xl text-sm transition-colors ${isActive ? 'bg-white text-black' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
+            >
               <Settings className="w-4 h-4" /> Settings
-            </button>
+            </NavLink>
             <button onClick={() => setShowHelp(true)} className="w-full flex items-center gap-3 px-3 h-8 rounded-xl hover:bg-white/10 text-sm text-white/60 hover:text-white transition-colors text-left">
               <HelpCircle className="w-4 h-4" /> Help
             </button>
@@ -176,37 +198,6 @@ export default function Sidebar({ collapsed, onClose }: { collapsed?: boolean, o
         )}
       </AnimatePresence>
 
-      {/* SETTINGS MODAL */}
-      <AnimatePresence>
-        {showSettings && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowSettings(false)}>
-            <motion.div initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 12 }} onClick={e => e.stopPropagation()} className="w-full max-w-[480px] rounded-[20px] bg-[#14141c] border border-white/10 overflow-hidden">
-              <div className="p-6">
-                <div className="flex justify-between items-start">
-                  <h3 className="text-lg font-black flex items-center gap-2"><Settings className="w-5 h-5" /> Settings</h3>
-                  <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5" /></button>
-                </div>
-                <div className="mt-6 space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#1c1c26] border border-white/5">
-                    <div><div className="text-sm font-semibold">Autoplay next video</div><div className="text-xs text-white/50">PS5-style continuous playback</div></div>
-                    <div className="w-11 h-6 rounded-full bg-[#ff4d00] relative"><div className="absolute right-0.5 top-0.5 w-5 h-5 rounded-full bg-white" /></div>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#1c1c26] border border-white/5">
-                    <div><div className="text-sm font-semibold">Immersive background</div><div className="text-xs text-white/50">Blur + cross-fade on hover</div></div>
-                    <div className="w-11 h-6 rounded-full bg-[#ff4d00] relative"><div className="absolute right-0.5 top-0.5 w-5 h-5 rounded-full bg-white" /></div>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#1c1c26] border border-white/5">
-                    <div><div className="text-sm font-semibold">8K quality</div><div className="text-xs text-white/50">Prefer 8K where available</div></div>
-                    <div className="w-11 h-6 rounded-full bg-white/15 relative"><div className="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white" /></div>
-                  </div>
-                  <button onClick={() => { setShowSettings(false); setToast('Settings saved to LocalStorage'); setTimeout(() => setToast(null), 2000) }} className="w-full h-10 rounded-full bg-white text-black font-bold">Save settings</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* HELP MODAL */}
       <AnimatePresence>
         {showHelp && (
@@ -220,7 +211,8 @@ export default function Sidebar({ collapsed, onClose }: { collapsed?: boolean, o
                 <div className="mt-5 grid grid-cols-1 gap-3 text-sm">
                   <div className="p-3 rounded-xl bg-[#1c1c26] border border-white/5"><span className="font-bold text-[#ff4d00]">Hover any card</span> → immersive blurred backdrop (PS5 effect, 500ms).</div>
                   <div className="p-3 rounded-xl bg-[#1c1c26] border border-white/5"><span className="font-bold">Create Video</span> → pick local file (ObjectURL, no CORS) or paste MP4 URL. Blank = Big Buck Bunny fallback.</div>
-                  <div className="p-3 rounded-xl bg-[#1c1c26] border border-white/5"><span className="font-bold">Studio</span> → analytics + manage videos (archive/delete) + Export JSON for persistence.</div>
+                  <div className="p-3 rounded-xl bg-[#1c1c26] border border-white/5"><span className="font-bold">Shorts</span> → vertical 9:16 snap-scroll, auto thumbnail at 1s via canvas.</div>
+                  <div className="p-3 rounded-xl bg-[#1c1c26] border border-white/5"><span className="font-bold">Settings</span> → Profile, Themes (Cinematic/AMOLED/Cyberpunk), Player, Privacy & Creator Reset.</div>
                   <div className="p-3 rounded-xl bg-[#1c1c26] border border-white/5 flex items-center gap-2"><Mail className="w-4 h-4" /> support@xinemax.local — sandbox demo, no real email.</div>
                 </div>
                 <button onClick={() => setShowHelp(false)} className="w-full mt-5 h-10 rounded-full bg-[#ff4d00] hover:bg-[#ff6a2b] font-bold">Got it</button>

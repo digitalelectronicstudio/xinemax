@@ -8,7 +8,7 @@ import CreateVideoModal from '../components/CreateVideoModal'
 import { Link } from 'react-router-dom'
 
 export default function Studio() {
-  const { currentUser, videos, users, deleteVideo } = useStore()
+  const { currentUser, videos, users, deleteVideo, settings } = useStore()
   const [showCreate, setShowCreate] = useState(false)
   const [archived, setArchived] = useState<Set<string>>(new Set())
 
@@ -24,9 +24,9 @@ export default function Studio() {
     const watchHoursPrecise = myVideos.reduce((a, v) => a + ((v.watchTimeMinutes || 5) * v.views / 60), 0)
     const totalLikes = myVideos.reduce((a, v) => a + v.likes, 0)
     const subs = users.find(u => u.id === currentUser?.id)?.subscribers ?? 0
-    const revenue = totalViews * 0.0032 // $3.2 CPM estimate
+    const revenue = totalViews * (settings.monetizationRate / 1000)
     return { totalViews, watchHours: Math.round(watchHoursPrecise), totalLikes, subs, revenue }
-  }, [myVideos, users, currentUser])
+  }, [myVideos, users, currentUser, settings.monetizationRate])
 
   const chartData = myVideos.map(v => ({
     name: v.title.slice(0, 18) + (v.title.length > 18 ? '…' : ''),
@@ -149,7 +149,7 @@ export default function Studio() {
               <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><DollarSign className="w-4 h-4 text-white" /></div>
               <div className="text-2xl font-black mt-3">${stats.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
               <div className="text-xs tracking-widest font-bold text-white/80 mt-1">EST. REVENUE</div>
-              <div className="text-xs text-white/80 mt-2">~$3.20 CPM • Xinemax Partner</div>
+              <div className="text-xs text-white/80 mt-2">{`~$${settings.monetizationRate.toFixed(2)} CPM • Xinemax Partner`}</div>
             </div>
           </motion.div>
         </div>

@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { ThumbsUp, ThumbsDown, Share2, Bookmark, ChevronDown, ChevronUp, Eye, Clock, Send, MoreHorizontal } from 'lucide-react'
@@ -7,14 +7,15 @@ import { motion } from 'framer-motion'
 
 export default function VideoPage() {
   const { id } = useParams()
-  const { videos, comments, currentUser, toggleLike, toggleDislike, toggleSubscribe, isSubscribed, addComment, incrementView, users } = useStore()
+  const navigate = useNavigate()
+  const { videos, comments, currentUser, toggleLike, toggleDislike, toggleSubscribe, isSubscribed, addComment, incrementView, users, settings } = useStore()
   const video = videos.find(v => v.id === id)
   const channelUser = users.find(u => u.id === video?.channelId)
   const [showDesc, setShowDesc] = useState(false)
   const [commentText, setCommentText] = useState("")
 
   const videoComments = useMemo(() => comments.filter(c => c.videoId === id).sort((a,b) => +new Date(b.timestamp) - +new Date(a.timestamp)), [comments, id])
-  const recommended = useMemo(() => videos.filter(v => v.id !== id).slice(0,6), [videos, id])
+  const recommended = useMemo(() => videos.filter(v => v.id !== id && v.format !== 'shorts').slice(0,6), [videos, id])
 
   // increment view once per video id - guard with Set to survive StrictMode double-mount in dev
   const incrementedIds = useRef<Set<string>>(new Set())
@@ -22,7 +23,6 @@ export default function VideoPage() {
     if (!id || !video) return
     if (incrementedIds.current.has(id)) return
     incrementedIds.current.add(id)
-    // small timeout to ensure UX feels like real view increment
     const t = setTimeout(() => incrementView(id), 400)
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -42,6 +42,7 @@ export default function VideoPage() {
   const isLiked = currentUser ? video.likedBy.includes(currentUser.id) : false
   const isDisliked = currentUser ? video.dislikedBy.includes(currentUser.id) : false
   const subscribed = isSubscribed(video.channelId)
+  const isCommentsRestricted = settings.restrictComments && video.channelId !== currentUser?.id
 
   const handleLike = () => {
     if (!currentUser) return alert("Please sign in to like videos.")
@@ -58,8 +59,16 @@ export default function VideoPage() {
   const handlePostComment = () => {
     if (!commentText.trim()) return
     if (!currentUser) return alert("Please sign in to comment.")
+    if (isCommentsRestricted) return
     addComment(video.id, commentText)
     setCommentText("")
+  }
+
+  const handleEnded = () => {
+    if (settings.autoplayNext && recommended[0]) {
+      // subtle delay to mimic YouTube autoplay countdown
+      setTimeout(() => navigate(`/watch/${recommended[0].id}`), 900)
+    }
   }
 
   return (
@@ -67,28 +76,46 @@ export default function VideoPage() {
       <div className="max-w-[1728px] mx-auto flex flex-col lg:flex-row">
         {/* main */}
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
-          {/* Player */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="relative aspect-video w-full rounded-[16px] overflow-hidden bg-black border border-white/10"
-          >
-            <video
-              key={video.videoUrl}
-              src={video.videoUrl}
-              controls
-              playsInline
-              poster={video.thumbnail}
-              className="w-full h-full object-contain bg-black"
-              onError={(e) => {
-                const el = e.target as HTMLVideoElement
-                if (el.src !== "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4") {
-                  el.src = "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4"
-                }
-              }}
-            />
-          </motion.div>
+          {/* Player with Ambient Glow */}
+          <div className="relative">
+            {settings.ambientGlow && (
+              <div className="absolute -inset-3 rounded-[20px] overflow-hidden pointer-events-none">
+                <img src={video.thumbnail} alt="" className="w-full h-full object-cover scale-110 blur-[32px] opacity-30" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#06060a]/40 to-transparent" />
+              </div>
+            )}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="relative aspect-video w-full rounded-[16px] overflow-hidden bg-black border border-white/10"
+            >
+              <video
+                key={video.videoUrl}
+                src={video.videoUrl}
+                controls
+                playsInline
+                poster={video.thumbnail}
+                onEnded={handleEnded}
+                className="w-full h-full object-contain bg-black"
+                onError={(e) => {
+                  const el = e.target as HTMLVideoElement
+                  if (el.src !== "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4") {
+                    el.src = "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4"
+                  }
+                }}
+              />
+              {/* quality badge */}
+              <div className="absolute top-3 left-3 px-2 py-1 rounded-full bg-black/70 backdrop-blur text-[11px] font-bold tracking-wide border border-white/10">
+                {settings.defaultQuality === '4K' ? '4K • SIM' : settings.defaultQuality}
+              </div>
+            </motion.div>
+          </div>
+          {settings.autoplayNext && recommended[0] && (
+            <div className="mt-2 text-xs text-white/40 flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Autoplay next: <span className="text-white/70 font-medium">{recommended[0].title.slice(0,40)}…</span>
+            </div>
+          )}
 
           {/* Title + meta */}
           <div className="mt-4">
@@ -169,6 +196,7 @@ export default function VideoPage() {
             <h3 className="font-bold flex items-center gap-3">
               {videoComments.length} Comments
               <span className="text-xs font-normal text-white/50">Sorted by newest</span>
+              {isCommentsRestricted && <span className="ml-auto text-xs px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">Comments restricted</span>}
             </h3>
 
             {/* composer */}
@@ -180,19 +208,20 @@ export default function VideoPage() {
                     value={commentText}
                     onChange={e=>setCommentText(e.target.value)}
                     onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); handlePostComment() } }}
-                    placeholder={currentUser ? "Add a comment…" : "Sign in to comment"}
-                    disabled={!currentUser}
+                    placeholder={isCommentsRestricted ? "Comments are disabled on this video" : currentUser ? "Add a comment…" : "Sign in to comment"}
+                    disabled={!currentUser || isCommentsRestricted}
                     className="w-full h-11 pl-4 pr-12 rounded-full bg-[#14141c] border border-white/10 focus:border-[#ff4d00]/40 focus:outline-none text-sm placeholder:text-white/40 disabled:opacity-60"
                   />
                   <button
                     onClick={handlePostComment}
-                    disabled={!commentText.trim() || !currentUser}
+                    disabled={!commentText.trim() || !currentUser || isCommentsRestricted}
                     className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#ff4d00] hover:bg-[#ff6a2b] disabled:bg-white/10 disabled:text-white/30 flex items-center justify-center transition-colors"
                   >
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
                 {!currentUser && <div className="text-xs text-white/40 mt-2">You must be signed in — pick Elena or create an account from the header.</div>}
+                {isCommentsRestricted && currentUser && <div className="text-xs text-amber-300/80 mt-2">Creator has restricted comments — only they can comment.</div>}
               </div>
             </div>
 
