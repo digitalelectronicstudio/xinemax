@@ -282,7 +282,7 @@ export default function Studio() {
         <div className="mt-6 rounded-xl bg-[#ff4d00]/10 border border-[#ff4d00]/20 p-4 flex gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#ff4d00] flex items-center justify-center shrink-0">◉</div>
           <div className="text-sm leading-relaxed text-white/80">
-            <span className="font-bold text-white">Pro tip:</span> All Studio actions mutate the global Zustand store and persist to <span className="font-mono text-[#ff8a00]">localStorage</span>. If you rebuild the sandbox container, export your JSON first — then re-import by staying on this branch.
+            <span className="font-bold text-white">Pro tip:</span> All Studio actions mutate the global Zustand store and persist to <span className="font-mono text-[#ff8a00]">secure storage</span>. If you rebuild the sandbox container, export your JSON first — then re-import by staying on this branch.
           </div>
         </div>
       </div>

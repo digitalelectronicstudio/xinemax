@@ -84,7 +84,7 @@ export default function SettingsPage() {
       publicEmail: form.publicEmail.trim(),
       avatar: form.avatar.trim() || currentUser.avatar,
     })
-    setToast('Profile updated — synced across channel & videos ✓')
+    setToast('Saved changes')
     setTimeout(() => setToast(null), 2200)
   }
 
@@ -115,12 +115,11 @@ export default function SettingsPage() {
           <div>
             <div className="inline-flex items-center gap-2 text-[11px] tracking-widest font-bold text-[#ff4d00]"><Shield className="w-3.5 h-3.5" /> SYSTEM SETTINGS</div>
             <h1 className="text-[28px] font-black tracking-tight mt-1">Settings</h1>
-            <p className="text-sm text-white/50 mt-1">Enterprise-grade controls — all persisted to LocalStorage, instant without reload.</p>
+            <p className="text-sm text-white/50 mt-1">Enterprise-grade controls — synced instantly, changes apply without reload.</p>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-white/50">All changes saved to </span>
-            <span className="font-mono text-[#ff8a00]">localStorage</span>
+            <span className="text-white/50">All changes saved</span>
           </div>
         </div>
 
@@ -219,7 +218,7 @@ export default function SettingsPage() {
                       ].map(th => (
                         <button
                           key={th.id}
-                          onClick={()=> { updateSettings({ theme: th.id as any }); setToast(`Theme: ${th.name}`); setTimeout(()=>setToast(null),1800)}}
+                          onClick={()=> { updateSettings({ theme: th.id as any }); setToast('Saved changes'); setTimeout(()=>setToast(null),1800)}}
                           className={`p-4 rounded-xl border text-left transition-all ${settings.theme===th.id ? 'bg-white text-black border-white shadow-lg' : 'bg-[#0a0a0f] border-white/10 hover:border-white/20 text-white'}`}
                         >
                           <div className={`w-full h-20 rounded-lg border flex items-center justify-center text-xs font-bold ${th.preview} ${settings.theme===th.id ? 'border-black/10' : 'border-white/10'}`}>
@@ -304,7 +303,7 @@ export default function SettingsPage() {
                         </div>
                       ))}
                       <div className="rounded-xl bg-[#1c1c26] border border-white/5 p-3 flex gap-3 text-xs leading-relaxed text-white/60">
-                        <Shield className="w-4 h-4 text-emerald-400 shrink-0" /> Privacy is local — stored in LocalStorage. Subscriptions page respects <span className="font-mono text-white">privateSubscriptions</span>.
+                        <Shield className="w-4 h-4 text-emerald-400 shrink-0" /> Privacy is synced — respects Subscriptions page respects <span className="font-mono text-white">privateSubscriptions</span>.
                       </div>
                     </div>
                   </div>
@@ -352,7 +351,7 @@ export default function SettingsPage() {
             <motion.div initial={{scale:0.96,y:12}} animate={{scale:1,y:0}} exit={{scale:0.96,y:12}} onClick={e=>e.stopPropagation()} className="w-full max-w-[420px] rounded-[20px] bg-[#14141c] border border-white/10 p-6">
               <div className="w-12 h-12 rounded-full bg-red-500/15 flex items-center justify-center mx-auto"><Trash2 className="w-6 h-6 text-red-400" /></div>
               <h3 className="font-black text-center mt-4">Reset everything?</h3>
-              <p className="text-sm text-white/60 text-center mt-2">This will wipe LocalStorage key <span className="font-mono text-white">xinemax-storage-v2</span> and restore 5 long + 3 Shorts mocks + Elena as current user.</p>
+              <p className="text-sm text-white/60 text-center mt-2">This will restore factory defaults: <span className="font-mono text-white">xinemax-storage-v2</span> — 5 long + 5 long + 3 Shorts mocks + Elena as current user.</p>
               <div className="flex gap-3 mt-6">
                 <button onClick={()=> setShowResetConfirm(false)} className="flex-1 h-11 rounded-full border border-white/10 hover:bg-white/5 font-bold text-sm">Cancel</button>
                 <button onClick={handleReset} className="flex-1 h-11 rounded-full bg-red-500 hover:bg-red-600 text-white font-bold text-sm">Yes, reset</button>

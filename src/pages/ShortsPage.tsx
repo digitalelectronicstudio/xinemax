@@ -1,21 +1,64 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ThumbsUp, ThumbsDown, MessageCircle, Share2, X, Send, Bell, BellOff, Eye, Sparkles } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, MessageCircle, Share2, X, Send, Bell, BellOff, Eye, Sparkles, Subtitles, Captions } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatViews, formatTimeAgo } from '../utils/format'
+import { getActiveCue, durationToSeconds, generateSubtitlePack, attachVTTTrack } from '../utils/subtitles'
+
+// Reactive window size hook — reliable CSS media query + resize listener (no tearing)
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+  )
+  useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const onChange = (e: any) => setIsMobile(!!e.matches)
+    setIsMobile(mql.matches)
+    // media query listener (reliable CSS)
+    try {
+      mql.addEventListener('change', onChange)
+    } catch {
+      // @ts-ignore legacy
+      mql.addListener(onChange)
+    }
+    const onResize = () => setIsMobile(window.innerWidth < breakpoint)
+    window.addEventListener('resize', onResize)
+    return () => {
+      try {
+        mql.removeEventListener('change', onChange)
+      } catch {
+        // @ts-ignore legacy
+        mql.removeListener(onChange)
+      }
+      window.removeEventListener('resize', onResize)
+    }
+  }, [breakpoint])
+  return isMobile
+}
 
 export default function ShortsPage() {
-  const { videos, comments, currentUser, toggleLike, toggleDislike, toggleSubscribe, isSubscribed, addComment, setToast, incrementView } = useStore()
+  const { videos, comments, currentUser, toggleLike, toggleDislike, toggleSubscribe, isSubscribed, addComment, setToast, incrementView, ensureVideoSubtitles } = useStore()
   const shorts = useMemo(() => videos.filter(v => v.format === 'shorts'), [videos])
 
   const [activeId, setActiveId] = useState<string | null>(shorts[0]?.id ?? null)
   const [showComments, setShowComments] = useState<string | null>(null)
   const [commentText, setCommentText] = useState("")
+  const [ccEnabled, setCcEnabled] = useState(true)
+  const [currentTimes, setCurrentTimes] = useState<Record<string, number>>({})
   const containerRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
+  const isMobile = useIsMobile(768)
 
-  // IntersectionObserver to track active short and increment view
+  // Ensure subtitles exist for all shorts (client-side VTT auto-generation + Firestore save)
+  useEffect(() => {
+    shorts.forEach(v => {
+      if (!v.subtitles) ensureVideoSubtitles(v.id)
+    })
+  }, [shorts, ensureVideoSubtitles])
+
+  // IntersectionObserver to track active short
   useEffect(() => {
     if (!shorts.length) return
     const observer = new IntersectionObserver(
@@ -23,11 +66,7 @@ export default function ShortsPage() {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             const id = entry.target.getAttribute('data-id')
-            if (id) {
-              setActiveId(id)
-              // increment view once per session per short when focused
-              // Use a simple Set via local closure
-            }
+            if (id) setActiveId(id)
           }
         })
       },
@@ -39,12 +78,16 @@ export default function ShortsPage() {
     return () => observer.disconnect()
   }, [shorts])
 
-  // Increment view when active changes (once per mount per short)
+  // Sync activeId when shorts change (handle hydration from Firestore causing order shift)
+  useEffect(() => {
+    if (!activeId && shorts[0]) setActiveId(shorts[0].id)
+    if (activeId && !shorts.find(s => s.id === activeId) && shorts[0]) setActiveId(shorts[0].id)
+  }, [shorts, activeId])
+
   const viewedRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (activeId && !viewedRef.current.has(activeId)) {
       viewedRef.current.add(activeId)
-      // delay to mimic real view
       const t = setTimeout(() => incrementView(activeId), 600)
       return () => clearTimeout(t)
     }
@@ -52,16 +95,23 @@ export default function ShortsPage() {
 
   // Pause/play videos based on active
   useEffect(() => {
-    const vids = Array.from(document.querySelectorAll<HTMLVideoElement>('.shorts-video'))
-    vids.forEach(v => {
-      const parent = v.closest('[data-id]')?.getAttribute('data-id')
-      if (parent === activeId) {
+    Object.entries(videoRefs.current).forEach(([id, v]) => {
+      if (!v) return
+      if (id === activeId) {
+        // Attach VTT track for AI subtitles (client-side TextTrack)
+        const vid = shorts.find(s => s.id === id)
+        if (vid?.subtitles?.vtt) {
+          try { attachVTTTrack(v, vid.subtitles.vtt) } catch {}
+        } else if (vid && !vid.subtitles) {
+          const pack = generateSubtitlePack(vid.title, vid.description, durationToSeconds(vid.duration))
+          try { attachVTTTrack(v, pack.vtt) } catch {}
+        }
         v.play().catch(() => {})
       } else {
         v.pause()
       }
     })
-  }, [activeId])
+  }, [activeId, shorts])
 
   const activeVideo = shorts.find(v => v.id === activeId) ?? shorts[0]
 
@@ -115,8 +165,8 @@ export default function ShortsPage() {
   }
 
   return (
-    <div className="flex-1 relative flex overflow-hidden h-[calc(100vh-56px)]">
-      {/* PS5 BACKGROUND GLOW — cross-fade 500ms blurred */}
+    <div className="flex-1 relative flex overflow-hidden h-[calc(100dvh-56px)] md:h-[calc(100vh-56px)] bg-[#06060a]">
+      {/* PS5 BACKGROUND GLOW — cross-fade 500ms blurred; visible on desktop as atmospheric backdrop, on mobile remains behind full-screen video */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[#06060a]" />
         <AnimatePresence mode="wait">
@@ -132,7 +182,7 @@ export default function ShortsPage() {
               <img
                 src={activeVideo.thumbnail}
                 alt=""
-                className="w-full h-full object-cover scale-110 blur-[32px] opacity-40"
+                className="w-full h-full object-cover scale-110 blur-[32px] opacity-40 md:opacity-40 opacity-25"
                 onError={(e)=> (e.target as HTMLImageElement).style.display='none'}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#06060a] via-[#06060a]/60 to-[#06060a]/20" />
@@ -154,123 +204,148 @@ export default function ShortsPage() {
           const disliked = currentUser ? v.dislikedBy.includes(currentUser.id) : false
           const subscribed = isSubscribed(v.channelId)
           const shortComments = comments.filter(c => c.videoId === v.id)
+          const pack = v.subtitles ?? generateSubtitlePack(v.title, v.description, durationToSeconds(v.duration))
+          const t = currentTimes[v.id] ?? 0
+          const activeCue = ccEnabled ? getActiveCue(pack.cues, t) : null
 
           return (
             <div
               key={v.id}
               data-id={v.id}
               ref={el => itemRefs.current[v.id] = el}
-              className="snap-start w-full flex justify-center items-center py-4 sm:py-6 shrink-0"
-              style={{ minHeight: 'calc(100vh - 56px)' }}
+              className="snap-start w-full flex justify-center items-stretch md:items-center shrink-0 p-0 md:py-6 min-h-[calc(100dvh-56px)] md:min-h-[calc(100vh-56px)]"
             >
-              {/* Mobile frame */}
-              <div className="relative w-full max-w-[360px] mx-3 sm:mx-0 flex justify-center">
-                <div className="relative aspect-[9/16] w-full max-h-[calc(100vh-100px)] bg-black rounded-[20px] overflow-hidden border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
-                  <video
-                    className="shorts-video w-full h-full object-cover"
-                    src={v.videoUrl}
-                    poster={v.thumbnail}
-                    loop
-                    playsInline
-                    controls
-                    // hide default controls styling via custom? Keep controls for fallback
-                    onError={(e)=> {
-                      const el = e.target as HTMLVideoElement
-                      if (el.src !== "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4") {
-                        el.src = "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4"
-                      }
-                    }}
-                  />
-                  {/* Top gradient + info */}
-                  <div className="absolute inset-x-0 top-0 p-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
-                    <div className="flex items-center gap-2">
-                      <Link to={`/channel/${v.channelId}`} className="flex items-center gap-2 pointer-events-auto">
-                        <img src={v.channelAvatar} alt={v.channelName} className="w-8 h-8 rounded-full object-cover border border-white/20" />
-                        <div className="leading-none">
-                          <div className="text-sm font-bold text-white flex items-center gap-1">{v.channelName}<span className="w-3 h-3 rounded-full bg-white text-black flex items-center justify-center text-[8px]">✓</span></div>
-                          <div className="text-xs text-white/70">{v.channelHandle}</div>
-                        </div>
-                      </Link>
-                      <button
-                        onClick={() => handleSubscribe(v.channelId, v.channelName)}
-                        className={`ml-auto h-7 px-3 rounded-full text-xs font-black flex items-center gap-1 pointer-events-auto ${subscribed ? 'bg-white/15 text-white border border-white/20 backdrop-blur' : 'bg-white text-black'}`}
-                      >
-                        {subscribed ? <><BellOff className="w-3 h-3" /> Subscribed</> : <><Bell className="w-3 h-3" /> Subscribe</>}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Bottom info */}
-                  <div className="absolute inset-x-0 bottom-0 p-3 pt-8 bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none">
-                    <h3 className="text-sm font-bold leading-tight text-white line-clamp-2">{v.title}</h3>
-                    <div className="flex items-center gap-2 text-xs text-white/60 mt-1">
-                      <Eye className="w-3 h-3" /> {formatViews(v.views)} views
-                      <span>•</span> {formatTimeAgo(v.uploadDate)}
-                      <span className="ml-auto px-1.5 py-0.5 rounded bg-[#ff4d00] text-white text-[10px] font-bold">SHORTS</span>
-                    </div>
-                    <div className="flex gap-1 mt-2 flex-wrap">
-                      {v.tags?.slice(0,3).map(t=> (
-                        <span key={t} className="px-2 py-0.5 rounded-full bg-white/10 backdrop-blur text-white/80 text-[11px] font-medium">#{t}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right translucent action bar */}
-                  <div className="absolute right-2 bottom-24 flex flex-col items-center gap-4">
-                    {/* Like */}
-                    <div className="flex flex-col items-center gap-1">
-                      <button
-                        onClick={() => handleLike(v.id)}
-                        className={`w-11 h-11 rounded-full backdrop-blur-xl border flex items-center justify-center transition-all ${liked ? 'bg-[#ff4d00] text-white border-[#ff4d00] shadow-[0_0_16px_rgba(255,77,0,0.5)]' : 'bg-white/15 border-white/20 text-white hover:bg-white/25'}`}
-                      >
-                        <ThumbsUp className={`w-5 h-5 ${liked ? 'fill-white' : ''}`} />
-                      </button>
-                      <span className="text-xs font-bold text-white drop-shadow">{formatViews(v.likes)}</span>
-                    </div>
-                    {/* Dislike */}
-                    <div className="flex flex-col items-center gap-1">
-                      <button
-                        onClick={() => handleDislike(v.id)}
-                        className={`w-11 h-11 rounded-full backdrop-blur-xl border flex items-center justify-center transition-all ${disliked ? 'bg-white text-black border-white' : 'bg-white/15 border-white/20 text-white hover:bg-white/25'}`}
-                      >
-                        <ThumbsDown className={`w-5 h-5 ${disliked ? 'fill-black' : ''}`} />
-                      </button>
-                      <span className="text-[11px] text-white/80">{v.dislikes > 0 ? formatViews(v.dislikes) : ''}</span>
-                    </div>
-                    {/* Comment */}
-                    <div className="flex flex-col items-center gap-1">
-                      <button
-                        onClick={() => setShowComments(v.id)}
-                        className="w-11 h-11 rounded-full bg-white/15 backdrop-blur-xl border border-white/20 text-white hover:bg-white/25 flex items-center justify-center"
-                      >
-                        <MessageCircle className="w-5 h-5" />
-                      </button>
-                      <span className="text-xs font-bold text-white drop-shadow">{shortComments.length}</span>
-                    </div>
-                    {/* Share */}
+              {/* Responsive frame: mobile edge-to-edge full-screen, desktop centered 9:16 max-w-md with blurred glow surrounding */}
+              <div className="relative w-full flex justify-center bg-black overflow-hidden h-[calc(100dvh-56px)] rounded-none border-0 mx-0 md:h-auto md:aspect-[9/16] md:max-w-[360px] md:max-h-[calc(100vh-100px)] md:rounded-[20px] md:border md:border-white/10 md:shadow-[0_16px_48px_rgba(0,0,0,0.6)] md:mx-3">
+                <video
+                  ref={el => videoRefs.current[v.id] = el}
+                  className="shorts-video w-full h-full object-cover"
+                  src={v.videoUrl}
+                  poster={v.thumbnail}
+                  loop
+                  playsInline
+                  controls={isMobile ? false : true}
+                  // Use custom controls on mobile for immersive feel, native on desktop
+                  onTimeUpdate={e => {
+                    const ct = (e.target as HTMLVideoElement).currentTime
+                    setCurrentTimes(prev => prev[v.id] === ct ? prev : { ...prev, [v.id]: ct })
+                  }}
+                  onError={(e)=> {
+                    const el = e.target as HTMLVideoElement
+                    if (el.src !== "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4") {
+                      el.src = "https://commondatastorage.googleapis.com/gtb-videos-bucket/sample/BigBuckBunny.mp4"
+                    }
+                  }}
+                />
+                {/* Top gradient + channel info — translucent overlay */}
+                <div className="absolute inset-x-0 top-0 p-3 md:p-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+                  <div className="flex items-center gap-2">
+                    <Link to={`/channel/${v.channelId}`} className="flex items-center gap-2 pointer-events-auto">
+                      <img src={v.channelAvatar} alt={v.channelName} className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                      <div className="leading-none">
+                        <div className="text-sm font-bold text-white flex items-center gap-1">{v.channelName}<span className="w-3 h-3 rounded-full bg-white text-black flex items-center justify-center text-[8px]">✓</span></div>
+                        <div className="text-xs text-white/70">{v.channelHandle}</div>
+                      </div>
+                    </Link>
                     <button
-                      onClick={handleShare}
+                      onClick={() => handleSubscribe(v.channelId, v.channelName)}
+                      className={`ml-auto h-7 px-3 rounded-full text-xs font-black flex items-center gap-1 pointer-events-auto ${subscribed ? 'bg-white/15 text-white border border-white/20 backdrop-blur' : 'bg-white text-black'}`}
+                    >
+                      {subscribed ? <><BellOff className="w-3 h-3" /> Subscribed</> : <><Bell className="w-3 h-3" /> Subscribe</>}
+                    </button>
+                  </div>
+                </div>
+
+                {/* AI Subtitles overlay — bottom-center, font-medium white backdrop-blur-md, strictly centered even on mobile fullscreen */}
+                {activeCue && (
+                  <div className="absolute bottom-[88px] md:bottom-20 left-1/2 -translate-x-1/2 w-[86%] max-w-[520px] flex justify-center pointer-events-none z-10 px-2">
+                    <div className="px-3 py-2 rounded-xl bg-black/45 backdrop-blur-md border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.45)] text-center">
+                      <p className="text-white font-medium text-[13px] md:text-sm leading-snug line-clamp-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                        {activeCue.text}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bottom info — translucent overlay */}
+                <div className="absolute inset-x-0 bottom-0 p-3 pt-8 bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none">
+                  <h3 className="text-sm font-bold leading-tight text-white line-clamp-2">{v.title}</h3>
+                  <div className="flex items-center gap-2 text-xs text-white/60 mt-1">
+                    <Eye className="w-3 h-3" /> {formatViews(v.views)} views
+                    <span>•</span> {formatTimeAgo(v.uploadDate)}
+                    <span className="ml-auto px-1.5 py-0.5 rounded bg-[#ff4d00] text-white text-[10px] font-bold">SHORTS</span>
+                  </div>
+                  <div className="flex gap-1 mt-2 flex-wrap">
+                    {v.tags?.slice(0,3).map(t=> (
+                      <span key={t} className="px-2 py-0.5 rounded-full bg-white/10 backdrop-blur text-white/80 text-[11px] font-medium">#{t}</span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right translucent action bar — 500ms blurred translucent */}
+                <div className="absolute right-2 md:right-2 bottom-20 md:bottom-24 flex flex-col items-center gap-3.5 md:gap-4">
+                  {/* CC strict toggle */}
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => setCcEnabled(!ccEnabled)}
+                      title={ccEnabled ? 'Hide captions' : 'Show captions'}
+                      className={`w-11 h-11 rounded-full backdrop-blur-xl border flex items-center justify-center transition-all ${ccEnabled ? 'bg-[#ff4d00] text-white border-[#ff4d00] shadow-[0_0_16px_rgba(255,77,0,0.5)]' : 'bg-white/15 border-white/20 text-white hover:bg-white/25'}`}
+                    >
+                      {ccEnabled ? <Subtitles className="w-5 h-5" /> : <Captions className="w-5 h-5 opacity-70" />}
+                    </button>
+                    <span className="text-[10px] font-bold tracking-wide text-white/80 drop-shadow">CC</span>
+                  </div>
+                  {/* Like */}
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => handleLike(v.id)}
+                      className={`w-11 h-11 rounded-full backdrop-blur-xl border flex items-center justify-center transition-all ${liked ? 'bg-[#ff4d00] text-white border-[#ff4d00] shadow-[0_0_16px_rgba(255,77,0,0.5)]' : 'bg-white/15 border-white/20 text-white hover:bg-white/25'}`}
+                    >
+                      <ThumbsUp className={`w-5 h-5 ${liked ? 'fill-white' : ''}`} />
+                    </button>
+                    <span className="text-xs font-bold text-white drop-shadow">{formatViews(v.likes)}</span>
+                  </div>
+                  {/* Dislike */}
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => handleDislike(v.id)}
+                      className={`w-11 h-11 rounded-full backdrop-blur-xl border flex items-center justify-center transition-all ${disliked ? 'bg-white text-black border-white' : 'bg-white/15 border-white/20 text-white hover:bg-white/25'}`}
+                    >
+                      <ThumbsDown className={`w-5 h-5 ${disliked ? 'fill-black' : ''}`} />
+                    </button>
+                    <span className="text-[11px] text-white/80">{v.dislikes > 0 ? formatViews(v.dislikes) : ''}</span>
+                  </div>
+                  {/* Comment */}
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => setShowComments(v.id)}
                       className="w-11 h-11 rounded-full bg-white/15 backdrop-blur-xl border border-white/20 text-white hover:bg-white/25 flex items-center justify-center"
                     >
-                      <Share2 className="w-5 h-5" />
+                      <MessageCircle className="w-5 h-5" />
                     </button>
-                    {/* Visit channel */}
-                    <Link
-                      to={`/channel/${v.channelId}`}
-                      className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/30 hover:border-[#ff4d00]/50 transition-colors"
-                    >
-                      <img src={v.channelAvatar} alt={v.channelName} className="w-full h-full object-cover" />
-                    </Link>
+                    <span className="text-xs font-bold text-white drop-shadow">{shortComments.length}</span>
                   </div>
-
-                  {/* Active glow border */}
-                  {isActive && (
-                    <motion.div
-                      layoutId="short-active"
-                      className="absolute inset-0 rounded-[20px] border border-[#ff4d00]/30 pointer-events-none shadow-[0_0_0_1px_rgba(255,77,0,0.25),0_0_32px_rgba(255,77,0,0.2)]"
-                    />
-                  )}
+                  {/* Share */}
+                  <button
+                    onClick={handleShare}
+                    className="w-11 h-11 rounded-full bg-white/15 backdrop-blur-xl border border-white/20 text-white hover:bg-white/25 flex items-center justify-center"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                  {/* Channel avatar */}
+                  <Link
+                    to={`/channel/${v.channelId}`}
+                    className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/30 hover:border-[#ff4d00]/50 transition-colors"
+                  >
+                    <img src={v.channelAvatar} alt={v.channelName} className="w-full h-full object-cover" />
+                  </Link>
                 </div>
+
+                {/* Mobile tap to pause/play hint — purely CSS overlay, zero layout box on mobile */}
+                {/* Active glow border — desktop only (hidden on mobile edge-to-edge) */}
+                {isActive && (
+                  <div className="hidden md:block absolute inset-0 rounded-[20px] border border-[#ff4d00]/30 pointer-events-none shadow-[0_0_0_1px_rgba(255,77,0,0.25),0_0_32px_rgba(255,77,0,0.2)]" />
+                )}
               </div>
             </div>
           )

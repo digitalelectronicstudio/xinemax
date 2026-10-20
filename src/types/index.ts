@@ -13,6 +13,19 @@ export interface User {
 
 export type VideoFormat = 'long' | 'shorts'
 
+export interface SubtitleCue {
+  start: number
+  end: number
+  text: string
+}
+
+export interface SubtitlePack {
+  vtt: string
+  cues: SubtitleCue[]
+  generatedAt: string
+  language: string
+}
+
 export interface Video {
   id: string;
   title: string;
@@ -34,6 +47,7 @@ export interface Video {
   tags: string[];
   watchTimeMinutes?: number;
   format?: VideoFormat; // 'shorts' for 9:16, undefined/'long' for 16:9
+  subtitles?: SubtitlePack | null
 }
 
 export interface Comment {
